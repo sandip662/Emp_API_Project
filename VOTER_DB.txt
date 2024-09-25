@@ -1,0 +1,349 @@
+CREATE TABLE [dbo].[VOTER](
+	[VOTER_KEY] [int] NOT NULL,
+	[NAME] [varchar](50) NULL,
+	[AGE] [int] NULL,
+	[GENDER_ID] [int] NULL,
+	[STATE_ID] [int] NULL,
+	[CITY_ID] [int] NULL,
+	[VOTERCARD_NO] [varchar](50) NULL,
+	[ACTIVE_FLAG] [varchar](50) NULL,
+ CONSTRAINT [PK_VOTER] PRIMARY KEY CLUSTERED 
+(
+	[VOTER_KEY] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+
+
+
+
+CREATE TABLE [dbo].[STATE_TABLE](
+	[STATE_ID] [int] NOT NULL,
+	[STATE_NAME] [varchar](50) NULL
+) ON [PRIMARY]
+GO
+
+
+
+
+
+CREATE TABLE [dbo].[CITY_TABLE](
+	[CITY_ID] [int] NOT NULL,
+	[CITY_NAME] [varchar](50) NULL,
+	[STATE_ID] [int] NOT NULL
+) ON [PRIMARY]
+GO
+
+
+
+
+CREATE TABLE [dbo].[GENDER_MASTER](
+	[GENDER_ID] [int] NOT NULL,
+	[GENDER_NAME] [varchar](50) NULL,
+ CONSTRAINT [PK_GENDER_MASTER] PRIMARY KEY CLUSTERED 
+(
+	[GENDER_ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+
+
+
+CREATE TABLE [dbo].[tblErrorMessage](
+	[tblErrorMessage_key] [int] NOT NULL,
+	[user_key] [int] NULL,
+	[spName] [varchar](150) NULL,
+	[errorMessage] [varchar](1000) NULL,
+	[systemDate] [smalldatetime] NULL,
+ CONSTRAINT [PK_tblErrorMessage] PRIMARY KEY CLUSTERED 
+(
+	[tblErrorMessage_key] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+
+
+
+
+
+
+
+
+
+
+
+
+ALTER PROCEDURE [dbo].[SP_CRUD_VOTER_DB]
+    @REC_TYPE VARCHAR(50),
+    @VOTER_KEY INT,
+    @NAME VARCHAR(50),
+    @AGE INT,
+    @GENDER_ID INT,
+	@STATE_ID INT,
+	@VOTERCARD_NO VARCHAR(50)
+
+AS
+Begin
+    SET NOCOUNT ON;
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        IF (@REC_TYPE = 'INSERT')
+        BEGIN
+	
+            -- INSERT SQL statements or logic as needed
+			SELECT @VOTER_KEY = ISNULL(MAX(VOTER_KEY), 0) + 1 FROM VOTER;
+			print (@VOTER_KEY);
+			INSERT INTO VOTER WITH (UPDLOCK, HOLDLOCK)
+			(VOTER_KEY,NAME,AGE,GENDER_ID,STATE_ID,CITY_ID, VOTERCARD_NO,ACTIVE_FLAG)
+			Values (@VOTER_KEY,@NAME, @AGE , @GENDER_ID ,@STATE_ID,1, @VOTERCARD_NO, 1);
+			print (@VOTER_KEY);
+        END
+        ELSE IF (@REC_TYPE = 'UPDATE')
+        BEGIN
+            -- UPDATE SQL statements or logic as needed
+            UPDATE VOTER
+            SET NAME = @NAME, AGE = @AGE, GENDER_ID = @GENDER_ID, STATE_ID = @STATE_ID, VOTERCARD_NO = @VOTERCARD_NO
+            WHERE VOTER_KEY = @VOTER_KEY;
+        END
+        ELSE IF (@REC_TYPE = 'DELETE')
+        BEGIN
+            -- DELETE SQL statements or logic as needed
+            UPDATE VOTER
+            SET ACTIVE_FLAG = 0
+            WHERE VOTER_KEY = @VOTER_KEY;
+        END
+
+        IF @@TRANCOUNT > 0
+        BEGIN
+            COMMIT TRANSACTION;
+        END
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+        END
+
+        -- Log error details if needed
+        -- INSERT INTO tblErrorMessage (SPName, errorMessage, systemData)
+        -- VALUES ('SP_CRUD_EMPLOYEES', ERROR_MESSAGE(), GETDATE());
+
+        -- Return an error code or message
+        RETURN -1;
+    END CATCH;
+
+    -- Return success status or primary key value
+    RETURN @VOTER_KEY;
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ALTER PROCEDURE [dbo].[SP_GET_VOTER_DB]
+	
+ @VOTER_KEY INT
+	
+
+As
+Begin 
+
+SET NOCOUNT ON;
+	
+   BEGIN TRY
+       
+        BEGIN TRANSACTION;
+
+        
+		
+		IF(@VOTER_KEY = 0)
+        BEGIN
+			
+            SELECT v.*, s.STATE_NAME, c.CITY_NAME, g.GENDER_NAME
+			FROM  VOTER v WITH (NOLOCK) 
+			INNER JOIN GENDER_MASTER g ON v.GENDER_ID = g.GENDER_ID
+			INNER JOIN STATE_TABLE s on v.STATE_ID =s.STATE_ID
+			INNER JOIN CITY_TABLE c on v.CITY_ID = c.CITY_ID
+			 WHERE v.ACTIVE_FLAG = 1
+								
+		END
+
+		 ELSE  
+        BEGIN
+	
+			 SELECT v.*, s.STATE_NAME, c.CITY_NAME, g.GENDER_NAME
+			 FROM  VOTER v WITH (NOLOCK) 
+			 INNER JOIN GENDER_MASTER g ON v.GENDER_ID = g.GENDER_ID
+			 INNER JOIN STATE_TABLE s on v.STATE_ID =s.STATE_ID
+			 INNER JOIN CITY_TABLE c on v.CITY_ID = c.CITY_ID
+			  WHERE v.VOTER_KEY = @VOTER_KEY 
+            
+        END
+
+    
+
+
+
+	IF @@TRANCOUNT > 0
+        BEGIN
+            COMMIT TRANSACTION;
+        END
+
+        RETURN @VOTER_KEY;
+    END TRY
+    BEGIN CATCH
+        IF @@ERROR <> 0  
+        BEGIN
+            ROLLBACK TRANSACTION;
+            INSERT INTO tblErrorMessage (spName, errorMessage, systemDate)
+            VALUES ('SP_GET_VOTER_DB', ERROR_MESSAGE(), GETDATE());
+            SET @VOTER_KEY = 0;
+        END
+    END CATCH
+END
+
+
+
+
+
+
+
+
+
+
+
+
+
+ALTER PROCEDURE [dbo].[SP_GET_STATE]
+	
+ @STATE_ID INT
+	
+
+As
+Begin 
+
+SET NOCOUNT ON;
+	
+   BEGIN TRY
+       
+        BEGIN TRANSACTION;
+
+        
+		
+		IF(@STATE_ID = 0)
+        BEGIN
+			
+            SELECT * FROM  STATE_TABLE WITH (NOLOCK)  
+								
+		END
+
+		 ELSE  
+        BEGIN
+	
+			 SELECT * FROM  STATE_TABLE WITH (NOLOCK) WHERE  STATE_ID = @STATE_ID 
+            
+        END
+
+    
+
+
+
+	IF @@TRANCOUNT > 0
+        BEGIN
+            COMMIT TRANSACTION;
+        END
+
+        RETURN @STATE_ID;
+    END TRY
+    BEGIN CATCH
+        IF @@ERROR <> 0  
+        BEGIN
+            ROLLBACK TRANSACTION;
+            INSERT INTO tblErrorMessage (spName, errorMessage, systemDate)
+            VALUES ('SP_GET_STATE', ERROR_MESSAGE(), GETDATE());
+            SET @STATE_ID = 0;
+        END
+    END CATCH
+END
+
+
+
+
+
+
+
+
+
+
+
+
+ALTER PROCEDURE [dbo].[SP_GET_GENDER]
+	
+ @GENDER_ID INT
+	
+
+As
+Begin 
+
+SET NOCOUNT ON;
+	
+   BEGIN TRY
+       
+        BEGIN TRANSACTION;
+
+        
+		
+		IF(@GENDER_ID = 0)
+        BEGIN
+			
+            SELECT * FROM  GENDER_MASTER WITH (NOLOCK)  
+								
+		END
+
+		 ELSE  
+        BEGIN
+	
+			 SELECT * FROM  GENDER_MASTER WITH (NOLOCK) WHERE  GENDER_ID = @GENDER_ID 
+            
+        END
+
+    
+
+
+
+	IF @@TRANCOUNT > 0
+        BEGIN
+            COMMIT TRANSACTION;
+        END
+
+        RETURN @GENDER_ID;
+    END TRY
+    BEGIN CATCH
+        IF @@ERROR <> 0  
+        BEGIN
+            ROLLBACK TRANSACTION;
+            INSERT INTO tblErrorMessage (spName, errorMessage, systemDate)
+            VALUES ('SP_GET_GENDER', ERROR_MESSAGE(), GETDATE());
+            SET @GENDER_ID = 0;
+        END
+    END CATCH
+END
+
+
+
+
